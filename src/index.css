@@ -1,0 +1,271 @@
+@import "tailwindcss";
+@custom-variant dark (&:where(.dark, .dark *));
+
+@utility squircle {
+  border-radius: var(--card-corner-radius, 20px);
+  corner-shape: squircle;
+}
+
+@utility corner-squircle {
+  corner-shape: squircle;
+}
+
+/* Clean custom scrollbar with no track background and no stepper triangles/buttons */
+::-webkit-scrollbar {
+  width: 5px;
+  height: 5px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent !important;
+}
+
+::-webkit-scrollbar-track-piece {
+  background: transparent !important;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(156, 163, 175, 0.35);
+  border-radius: 9999px;
+  transition: background 0.2s ease;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(156, 163, 175, 0.6);
+}
+
+::-webkit-scrollbar-button {
+  display: none !important;
+  width: 0 !important;
+  height: 0 !important;
+}
+
+::-webkit-scrollbar-corner {
+  background: transparent !important;
+}
+
+.dark ::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.dark ::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.38);
+}
+
+/* Firefox standard scrollbar rules */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(156, 163, 175, 0.35) transparent;
+}
+
+/* Invisible scrollbar utility to ensure 100% width matching between overlays */
+.no-scrollbar::-webkit-scrollbar {
+  display: none !important;
+  width: 0 !important;
+  height: 0 !important;
+}
+
+.no-scrollbar {
+  -ms-overflow-style: none !important;
+  scrollbar-width: none !important;
+}
+
+.dark * {
+  scrollbar-color: rgba(255, 255, 255, 0.2) transparent;
+}
+
+
+/* Global Theme Transition: Slow down color changes ONLY when explicitly toggling dark mode */
+.theme-transitioning,
+.theme-transitioning *,
+.theme-transitioning *::before,
+.theme-transitioning *::after {
+  transition-property: color, background-color, border-color, text-decoration-color, fill, stroke, box-shadow !important;
+  transition-duration: 600ms !important;
+  transition-timing-function: ease-in-out !important;
+}
+
+/* 4K Performance & Intent-Driven Lazy Degradation:
+   Aggressively strip heavy DOM rendering and expensive CSS effects during active zooming/panning for Asset Cards & Generation Cards */
+#canvas-workspace[data-zooming="true"],
+#canvas-workspace[data-panning="true"],
+#canvas-workspace[data-gesture="true"] {
+  pointer-events: none !important;
+}
+
+#canvas-workspace[data-zooming="true"] .generation-card,
+#canvas-workspace[data-panning="true"] .generation-card,
+#canvas-workspace[data-gesture="true"] .generation-card,
+#canvas-workspace[data-zooming="true"] .asset-card,
+#canvas-workspace[data-panning="true"] .asset-card,
+#canvas-workspace[data-gesture="true"] .asset-card {
+  transition: none !important;
+  transition-duration: 0s !important;
+  animation: none !important;
+}
+
+.lod-crossfade {
+  transition: opacity 400ms ease-out !important;
+}
+
+#canvas-workspace[data-zooming="true"] .asset-card,
+#canvas-workspace[data-panning="true"] .asset-card,
+#canvas-workspace[data-gesture="true"] .asset-card,
+#canvas-workspace[data-zooming="true"] .generation-card,
+#canvas-workspace[data-panning="true"] .generation-card,
+#canvas-workspace[data-gesture="true"] .generation-card {
+  box-shadow: none !important;
+  filter: none !important;
+  backdrop-filter: none !important;
+  transition: none !important;
+}
+
+/* GPU Raster Texture Scaling during Canvas gestures (Zoom / Pan / Drag):
+   Keep the REAL DOM prompt panel 100% visible (full text, real reference thumbnails, buttons),
+   and promote its entire container to a SINGLE GPU Composited Bitmap Texture (will-change: transform / transform: translateZ(0)).
+   Chromium's GPU Compositor scales the exact visual content of the prompt panel as a pure GPU raster image at 120 FPS,
+   preventing internal DOM re-layouts, font re-rasterizations, and low-detail skeleton replacements! */
+#canvas-workspace[data-zooming="true"] .generation-card-bottom-panel,
+#canvas-workspace[data-panning="true"] .generation-card-bottom-panel,
+#canvas-workspace[data-gesture="true"] .generation-card-bottom-panel,
+.drag-degraded.generation-card-bottom-panel {
+  opacity: 1 !important;
+  pointer-events: none !important;
+  will-change: transform !important;
+  transform: translateZ(0) !important;
+  transition: none !important;
+  corner-shape: unset !important;
+  box-shadow: none !important;
+  border-radius: 12px !important;
+}
+
+#canvas-workspace[data-zooming="true"] .generation-card-bottom-panel *,
+#canvas-workspace[data-panning="true"] .generation-card-bottom-panel *,
+#canvas-workspace[data-gesture="true"] .generation-card-bottom-panel * {
+  pointer-events: none !important;
+  transition: none !important;
+  animation: none !important;
+}
+
+#canvas-workspace[data-zooming="true"] .generation-card-body,
+#canvas-workspace[data-panning="true"] .generation-card-body,
+#canvas-workspace[data-gesture="true"] .generation-card-body,
+#canvas-workspace[data-zooming="true"] .asset-card,
+#canvas-workspace[data-panning="true"] .asset-card,
+#canvas-workspace[data-gesture="true"] .asset-card,
+.drag-degraded.generation-card-body {
+  corner-shape: unset !important;
+  box-shadow: none !important;
+  border-radius: 12px !important;
+}
+
+#canvas-workspace[data-zooming="true"] .ref-thumb-tag,
+#canvas-workspace[data-panning="true"] .ref-thumb-tag,
+#canvas-workspace[data-gesture="true"] .ref-thumb-tag {
+  opacity: 0 !important;
+  transition: none !important;
+}
+
+/* Video display during canvas motion: keep video visible without transition delays */
+#canvas-workspace[data-zooming="true"] video,
+#canvas-workspace[data-panning="true"] video,
+#canvas-workspace[data-gesture="true"] video {
+  transition: none !important;
+  pointer-events: none !important;
+}
+
+#canvas-workspace video {
+  pointer-events: none;
+}
+
+/* Asset Card Header Tags & Text Labels (Filename, Resolution Badge):
+   - In Standard LOD: Statically flex layout, smooth entrance is handled cleanly by motion.div
+   - Micro & Nano LOD: Instantly hide text labels without any transition */
+.asset-heavy-dom,
+.card-header-tag {
+  display: flex;
+}
+
+.card-header-tag {
+  opacity: 0;
+  transition: opacity 700ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.card-header-tag.tag-visible {
+  opacity: 1;
+}
+
+#canvas-workspace[data-scale-micro="true"] .asset-heavy-dom,
+#canvas-workspace[data-scale-nano="true"] .asset-heavy-dom,
+#canvas-workspace[data-scale-micro="true"] .card-header-tag,
+#canvas-workspace[data-scale-nano="true"] .card-header-tag {
+  opacity: 0 !important;
+  transition: none !important;
+  animation: none !important;
+  pointer-events: none !important;
+}
+
+/* Smooth LOD switch fade-in effect for tags when transitioning from Micro/Nano to Standard LOD */
+#canvas-workspace[data-zooming="true"][data-lod-fade="true"] .card-header-tag,
+#canvas-workspace[data-panning="true"][data-lod-fade="true"] .card-header-tag,
+#canvas-workspace[data-gesture="true"][data-lod-fade="true"] .card-header-tag,
+#canvas-workspace[data-lod-fade="true"] .card-header-tag {
+  animation: lod-text-fade-in 700ms cubic-bezier(0.16, 1, 0.3, 1) forwards !important;
+}
+
+@keyframes lod-text-fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+/* Initial card mount smooth fade-in for tags */
+.card-tag-fade-in {
+  animation: card-tag-enter 350ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@keyframes card-tag-enter {
+  from {
+    opacity: 0;
+    transform: translateY(-2px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Overview Mode: Hide native cursor so only the blue viewport box is visible */
+.overview-active-mode,
+.overview-active-mode * {
+  cursor: none !important;
+}
+
+/* Agent Pointer HUD Compositor Float & Subpixel Stabilization */
+@keyframes agent-cursor-float {
+  0%, 100% {
+    transform: translate3d(0, 0px, 0);
+  }
+  50% {
+    transform: translate3d(0, -5px, 0);
+  }
+}
+
+.animate-agent-float {
+  animation: agent-cursor-float 2.4s ease-in-out infinite;
+  will-change: transform;
+}
+
+/* GPU Hardware Acceleration & Layer Promotion:
+   Forces GPU rasterization, texture promotion, and zero main-thread CPU repaints for all canvas renderers and cards */
+canvas,
+.gpu-accelerated,
+.generation-card,
+.asset-card,
+#nano-lod-canvas {
+  transform: translate3d(0, 0, 0);
+  will-change: transform;
+  backface-visibility: hidden;
+}
