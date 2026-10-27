@@ -326,10 +326,11 @@ const getClosestAspectRatio = (width: number, height: number): '1:1' | '3:4' | '
 const ZoomControlGroup: React.FC<{
   tScale: any;
   isOverviewMode: boolean;
+  isScriptPanelOpen: boolean;
   onZoomIn: () => void;
   onZoomOut: () => void;
   onZoomReset: () => void;
-}> = React.memo(({ tScale, isOverviewMode, onZoomIn, onZoomOut, onZoomReset }) => {
+}> = React.memo(({ tScale, isOverviewMode, isScriptPanelOpen, onZoomIn, onZoomOut, onZoomReset }) => {
   const [scaleVal, setScaleVal] = useState(() => tScale.get());
 
   useEffect(() => {
@@ -366,8 +367,13 @@ const ZoomControlGroup: React.FC<{
   }
 
   return (
-    <div 
-      className="fixed bottom-6 left-6 z-50 flex items-center bg-gray-100/90 dark:bg-neutral-800/90 backdrop-blur-md border border-gray-200/80 dark:border-[#404040]/80 shadow-md rounded-[20px] corner-squircle p-1.5 gap-1 select-none"
+    <motion.div
+      initial={false}
+      animate={{ x: isScriptPanelOpen ? -240 : 0, opacity: isScriptPanelOpen ? 0 : 1 }}
+      transition={{ duration: 0.24, ease: [0.22, 1, 0.36, 1] }}
+      aria-hidden={isScriptPanelOpen}
+      style={{ pointerEvents: isScriptPanelOpen ? 'none' : 'auto' }}
+      className="fixed bottom-4 left-4 z-50 flex items-center bg-gray-100/90 dark:bg-neutral-800/90 backdrop-blur-md border border-gray-200/80 dark:border-[#404040]/80 shadow-md rounded-[20px] corner-squircle p-1.5 gap-1 select-none"
       onPointerDown={e => e.stopPropagation()}
     >
       <button
@@ -404,7 +410,7 @@ const ZoomControlGroup: React.FC<{
       >
         <Plus className="w-3.5 h-3.5 text-gray-700 dark:text-neutral-300" />
       </button>
-    </div>
+    </motion.div>
   );
 });
 
@@ -8135,7 +8141,7 @@ export default function App() {
       {isTaskPanelCollapsed ? (
         <aside
           onClick={() => setIsTaskPanelCollapsed(false)}
-          className="fixed bottom-5 right-5 z-[90] h-[44px] px-3.5 rounded-[22px] corner-squircle border border-gray-200/90 bg-white/95 shadow-[0_12px_32px_rgba(0,0,0,0.12)] dark:border-[#3a3a3a] dark:bg-neutral-800/95 flex items-center gap-2.5 backdrop-blur-md cursor-pointer hover:shadow-lg transition-all select-none"
+          className="fixed bottom-4 right-4 z-[90] h-[44px] px-3.5 rounded-[22px] corner-squircle border border-gray-200/90 bg-white/95 shadow-[0_12px_32px_rgba(0,0,0,0.12)] dark:border-[#3a3a3a] dark:bg-neutral-800/95 flex items-center gap-2.5 backdrop-blur-md cursor-pointer hover:shadow-lg transition-all select-none"
           title="点击展开对话框"
         >
           <div className="flex items-center gap-1.5">
@@ -8169,7 +8175,7 @@ export default function App() {
           </button>
         </aside>
       ) : (
-        <aside className="fixed bottom-5 right-5 z-[90] w-[330px] rounded-[22px] corner-squircle border border-gray-200/90 bg-white/95 p-3.5 shadow-[0_16px_48px_rgba(0,0,0,0.18)] dark:border-[#3a3a3a] dark:bg-neutral-800/95 flex flex-col gap-2.5 backdrop-blur-md">
+        <aside className="fixed bottom-4 right-4 z-[90] w-[330px] rounded-[22px] corner-squircle border border-gray-200/90 bg-white/95 p-3.5 shadow-[0_16px_48px_rgba(0,0,0,0.18)] dark:border-[#3a3a3a] dark:bg-neutral-800/95 flex flex-col gap-2.5 backdrop-blur-md">
           {/* Header */}
           <div className="flex items-center justify-between gap-2">
             <div className="min-w-0 flex-1">
@@ -8470,6 +8476,7 @@ export default function App() {
       <ZoomControlGroup
         tScale={tScale}
         isOverviewMode={isOverviewMode}
+        isScriptPanelOpen={isScriptDrawerOpen}
         onZoomIn={handleZoomIn}
         onZoomOut={handleZoomOut}
         onZoomReset={handleZoomReset}
@@ -8477,7 +8484,7 @@ export default function App() {
 
       {/* Floating Toolbar */}
       <div 
-        className="absolute bottom-6 left-1/2 -translate-x-1/2 flex items-center gap-2 bg-gray-100 dark:bg-neutral-800 border border-gray-200 dark:border-[#404040] shadow-lg rounded-[20px] corner-squircle p-1.5 z-50"
+        className="absolute bottom-4 left-1/2 -translate-x-1/2 flex items-center gap-2 bg-gray-100 dark:bg-neutral-800 border border-gray-200 dark:border-[#404040] shadow-lg rounded-[20px] corner-squircle p-1.5 z-50"
         onPointerDown={e => e.stopPropagation()}
       >
         <button 
