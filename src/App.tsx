@@ -14,7 +14,7 @@ import { resizeImageOffThread } from './utils/imageResize';
 import { yieldToMain } from './utils/yieldToMain';
 import { getOrLoadCanvasImage } from './utils/imageTextureCache';
 import { isCardIntersectingRectangle, getLodMountQuota, getNanoLodThreshold, CARD_DENSITY_HIGH_THRESHOLD, HIGH_RENDER_WEIGHT_THRESHOLD, calculateTotalRenderWeight, FRAME_BUDGET_MS } from './utils/viewportCulling';
-import { CANVAS_IDLE_MS, scheduleCanvasSurface, canLoadDuringCameraGesture, subscribeCanvasLoadingMode } from './utils/canvasPerformance';
+import { CANVAS_IDLE_MS, scheduleCanvasSurface, canLoadDuringCameraGesture, subscribeCanvasLoadingMode, getCanvasLoadingMode } from './utils/canvasPerformance';
 import { readyPromptPanels } from './utils/promptSurfaceCache';
 import { createCardMountStore, ProgressiveGenerationCard } from './components/ProgressiveGenerationCard';
 import { canRetireDomForNano, type LodFrame } from './utils/lodHandoff';
@@ -40,7 +40,8 @@ import { AGENT_TOOL_REGISTRY, getAgentToolConfig } from './agent/toolRegistry';
 import { getPageComponentDefinition, type MouseActionName } from './agent/pageComponentRegistry';
 import { buildAutoInjectedCardContext, buildMultiCardInjectedContext } from './agent/cardContextBuilder';
 import { agentFocusManager, type AgentFocusSnapshot } from './agent/agentFocusManager';
-import { AnimatePresence, motion, useMotionValue, animate, useMotionTemplate, useMotionValueEvent, useTransform } from 'motion/react';
+import { AnimatePresence, motion, useMotionValue, animate, useMotionValueEvent } from 'motion/react';
+import { CanvasGridBackground } from './components/CanvasGridBackground';
 
 const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
@@ -432,10 +433,6 @@ export default function App() {
   const ty = useMotionValue(initialTransform.y);
   const tScale = useMotionValue(initialTransform.scale);
   
-  // Create derived motion values for the infinite background grid
-  const gridBackgroundPosition = useMotionTemplate`${tx}px ${ty}px`;
-  const gridBackgroundSize = useTransform(tScale, (s: any) => `${s * 48}px ${s * 48}px`);
-
   // Inject real-time scale as CSS variable for GPU-accelerated constant-width borders
   const updateCurrentScale = (latestScale: number) => {
     if (latestScale < getNanoLodThreshold()) pauseVideosForNanoLod();
@@ -3696,6 +3693,8 @@ export default function App() {
     // Camera gestures refresh visible candidates in bounded intervals while moving.
     // Individual-card dragging still defers loading.
     const liveCameraGesture = canLoadDuringCameraGesture();
+    const liveNanoCamera = tScale.get() < getNanoLodThreshold() &&
+      !(window as any).isDraggingCard && !(window as any).__nanoDragging;
     const isGestureActive = Boolean(
       isDraggingCanvasRef.current ||
       isZoomingRef.current ||
@@ -3708,10 +3707,10 @@ export default function App() {
       ))
     );
 
-    if (!_forceImmediate && isGestureActive && !liveCameraGesture) {
+    if (!_forceImmediate && isGestureActive && !liveCameraGesture && !liveNanoCamera) {
       return;
     }
-    if (!_forceImmediate && liveCameraGesture) {
+    if (!_forceImmediate && (liveCameraGesture || (isGestureActive && liveNanoCamera))) {
       const elapsed = Date.now() - lastVisibleSetUpdateTimeRef.current;
       if (elapsed < 80) {
         cullingThrottleTimerRef.current = setTimeout(() => updateCircularCulling(), 80 - elapsed);
@@ -3956,11 +3955,7 @@ export default function App() {
 
   useEffect(() => {
     const unsub = tScale.on('change', (s) => {
-      // Admit the next LOD during camera motion; its cards still mount progressively.
-      // Keep the existing painted-frame handoff to avoid blank transitions.
-      if ((isZoomingRef.current || isDraggingCanvasRef.current) && !canLoadDuringCameraGesture()) {
-        return;
-      }
+      // Track Nano LOD independently of the DOM admission policy.
       const threshold = getNanoLodThreshold();
       const isMicro = s < threshold;
       const isNano = s < threshold;
@@ -6390,6 +6385,7 @@ export default function App() {
   const hasActivatedPanRef = useRef(false);
   const panStartPointerRef = useRef({ x: 0, y: 0 });
 
+  const lastCameraChangeRef = useRef(0);
   // Intent-driven lazy restoration logic
   const restoreCanvasStyles = useCallback(() => {
     // Never restore while a pointer is held or a programmatic camera animation is running.
@@ -6403,6 +6399,14 @@ export default function App() {
     const workspace = document.getElementById('canvas-workspace');
     const wasDegraded = isZoomingRef.current || workspace?.getAttribute('data-gesture') === 'true';
     if (!wasDegraded && !document.querySelector('video[data-was-playing="true"]')) return;
+    if (wasDegraded && getCanvasLoadingMode() === 'lazy') {
+      const remaining = CANVAS_IDLE_MS - (performance.now() - lastCameraChangeRef.current);
+      if (remaining > 0) {
+        clearTimeout(zoomTimeoutRef.current);
+        zoomTimeoutRef.current = setTimeout(restoreCanvasStyles, remaining);
+        return;
+      }
+    }
     clearTimeout(zoomTimeoutRef.current);
     workspace?.removeAttribute('data-zooming');
     workspace?.removeAttribute('data-panning');
@@ -6481,6 +6485,7 @@ export default function App() {
     const onCameraChange = () => {
       const workspace = document.getElementById('canvas-workspace');
       if (!isZoomingRef.current && workspace?.getAttribute('data-gesture') !== 'true') return;
+      lastCameraChangeRef.current = performance.now();
       clearTimeout(zoomTimeoutRef.current);
       zoomTimeoutRef.current = setTimeout(restoreCanvasStyles, CANVAS_IDLE_MS);
     };
@@ -6778,7 +6783,7 @@ export default function App() {
       // isZooming already pauses the mount queue; avoid an extra latch that
       // could remain set if this tween is interrupted by another gesture.
       const transition = { type: 'tween' as const, duration: 0.36, ease: [0.16, 1, 0.3, 1] as [number, number, number, number] };
-      // Wait for all camera axes, then start normal progressive loading immediately.
+      // Immediate mode resumes at the end; lazy mode waits for camera idle.
       void Promise.all([
         animate(tScale, 1, transition),
         animate(tx, targetTx, transition),
@@ -6787,7 +6792,12 @@ export default function App() {
         // A wheel gesture or a newer zoom owns restoration if this one was superseded.
         if (targetTransform.current !== destination) return;
         clearTimeout(zoomTimeoutRef.current);
-        restoreCanvasStyles();
+        if (getCanvasLoadingMode() === 'lazy') {
+          lastCameraChangeRef.current = performance.now();
+          zoomTimeoutRef.current = setTimeout(restoreCanvasStyles, CANVAS_IDLE_MS);
+        } else {
+          restoreCanvasStyles();
+        }
       });
     };
     if (currentScale > 1.001) {
@@ -6928,6 +6938,7 @@ export default function App() {
       // Keep the adaptive queue running across wheel ticks; visibility updates reprioritize it.
 
       // 2. Clear the fallback timeout on every wheel tick
+      lastCameraChangeRef.current = performance.now();
       clearTimeout(zoomTimeoutRef.current);
       
       // Continuous pinch on touchpad produces smaller deltaY, discrete mouse wheel produces larger deltaY
@@ -6974,7 +6985,13 @@ export default function App() {
     };
   }, [tx, ty, tScale, restoreCanvasStyles]);
 
+  const isCanvasOverlayTarget = (target: EventTarget | null) =>
+    target instanceof Element && Boolean(target.closest(
+      'button, input, textarea, select, form, aside, [role="dialog"], [role="menu"], [data-prevent-canvas-wheel]'
+    ));
+
   const onPointerDown = (e: React.PointerEvent) => {
+    if (isCanvasOverlayTarget(e.target)) return;
     const rect = containerRef.current?.getBoundingClientRect();
     if (!rect) return;
 
@@ -7134,7 +7151,6 @@ export default function App() {
             workspace.setAttribute('data-panning', 'true');
             workspace.setAttribute('data-gesture', 'true');
             window.dispatchEvent(new CustomEvent('canvas-gesture-start'));
-            window.dispatchEvent(new CustomEvent('resume-mount-queue'));
           }
           // Offload background video pauses to next animation frame to prevent pointerdown jank
           requestAnimationFrame(() => {
@@ -7256,9 +7272,9 @@ export default function App() {
 
     // Reset idle timer after drag: 300ms idle fallback
     if (e.button === 1) {
+      if (hasActivatedPanRef.current) lastCameraChangeRef.current = performance.now();
       clearTimeout(zoomTimeoutRef.current);
       zoomTimeoutRef.current = setTimeout(restoreCanvasStyles, CANVAS_IDLE_MS);
-      window.dispatchEvent(new CustomEvent('resume-mount-queue'));
     }
     
     setSelectionBox(null);
@@ -7572,6 +7588,7 @@ export default function App() {
       data-agent-actions="mouse.move mouse.hover mouse.drag mouse.scroll mouse.click mouse.doubleClick"
       className={`w-screen h-screen overflow-hidden bg-[#e7e7e7] dark:bg-[#1c1c1e] relative select-none touch-none ${isOverviewMode ? 'overview-active-mode' : ''}`}
       onPointerDownCapture={(e) => {
+        if (isCanvasOverlayTarget(e.target)) return;
         // If in overview mode and user left-clicks, navigate and dive down into the clicked position!
         if (e.button === 0 && (preOverviewTransform.current || isOverviewModeRef.current)) {
           e.stopPropagation();
@@ -7740,15 +7757,7 @@ export default function App() {
       </AnimatePresence>
 
       {/* Infinite Dotted Grid Background - Lifted outside of transform workspace to fix compositor memory crash */}
-      <motion.div 
-        id="grid-bg-overlay"
-        className="fixed inset-0 pointer-events-none opacity-30 dark:opacity-15 z-0"
-        style={{
-          backgroundImage: 'radial-gradient(circle, #a1a1aa 2px, transparent 2px)',
-          backgroundPosition: gridBackgroundPosition,
-          backgroundSize: gridBackgroundSize,
-        }}
-      />
+      <CanvasGridBackground tx={tx} ty={ty} scale={tScale} />
 
       {/* Nano-LOD High Performance Hybrid Canvas Layer (Active when scale < 0.40 or during staggered DOM loading) */}
       {(() => {
@@ -7772,6 +7781,7 @@ export default function App() {
             cards={cards}
             selectedCardIds={selectedCardIds}
             renderedCardIds={renderedCardIds}
+            domCardsActive={isDomCardsActive}
             agentTargetCardId={
               agentFocus.primaryCardId || 
               (agentQuickInput?.isOpen && agentQuickInput.targetId ? agentQuickInput.targetId : null)

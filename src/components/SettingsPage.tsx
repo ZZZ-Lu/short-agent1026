@@ -695,10 +695,11 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ onClose, currentProj
                 ? 'border-violet-500/40 bg-violet-50 text-violet-700 dark:border-violet-500/40 dark:bg-violet-950/40 dark:text-violet-300 font-medium'
                 : 'border-slate-200 text-slate-500 hover:bg-slate-50 dark:border-white/10 dark:text-slate-400 dark:hover:bg-white/10'
             }`}
-            title="画布分批加载模式切换。开启：缩放、拖拽时实时分批加载。关闭：停止操作 300ms 后懒分批加载。两种模式均自动调整加载节奏。"
+            aria-label="即时分批加载"
+            title="点击切换加载模式。即时模式在缩放、拖拽时分批加载；懒加载模式在停止操作 300ms 后分批加载。"
           >
             <Zap size={13} className={loadingMode === 'immediate' ? 'text-violet-600 dark:text-violet-400' : 'text-slate-400'} />
-            <span>{loadingMode === 'immediate' ? '即时分批加载 · 开' : '懒分批加载 · 关'}</span>
+            <span>{loadingMode === 'immediate' ? '即时分批加载（开启）' : '懒分批加载（开启）'}</span>
           </button>
 
           {settingsSection === 'debug' && <select

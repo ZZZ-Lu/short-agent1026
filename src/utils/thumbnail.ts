@@ -481,7 +481,9 @@ export function getOrLoadThumbImage(
     }
   };
   img.onerror = () => {
+    const callbacks = pendingThumbCallbacks.get(url);
     pendingThumbCallbacks.delete(url);
+    callbacks?.forEach(cb => cb());
   };
   img.src = url;
   thumbImageCache.set(url, img);

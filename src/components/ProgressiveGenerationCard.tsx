@@ -1,5 +1,6 @@
 import { isNewCardAwaitingLod } from '../utils/cardEntrance';
 import { getNanoLodThreshold } from '../utils/viewportCulling';
+import { getCanvasLoadingMode } from '../utils/canvasPerformance';
 import React, { useCallback, useRef, useState, useSyncExternalStore } from 'react';
 import { GenerationCard } from './GenerationCard';
 
@@ -35,10 +36,20 @@ export const ProgressiveGenerationCard = React.memo(function ProgressiveGenerati
   const subscribeScale = useCallback((listener: () => void) => newCard ? props.scale.on('change', listener) : () => {}, [newCard, props.scale]);
   const getDomLod = useCallback(() => !newCard || props.scale.get() >= getNanoLodThreshold(), [newCard, props.scale]);
   const useDomLod = useSyncExternalStore(subscribeScale, getDomLod, getDomLod);
-  const subscribe = useCallback((listener: () => void) => mountStore.subscribe(id, listener), [id, mountStore]);
-  const snapshot = useCallback(() => Boolean(isSelected || mountStore.ids.has(id)), [id, isSelected, mountStore]);
-  const mounted = useSyncExternalStore(subscribe, snapshot, snapshot);
   const admittedDom = useRef(false);
-  if (useDomLod && (mounted || isSelected)) admittedDom.current = true;
-  return (admittedDom.current || useDomLod) && (mounted || isSelected) ? <GenerationCard {...props} /> : null;
+  const subscribe = useCallback((listener: () => void) => {
+    const unsubscribe = mountStore.subscribe(id, listener);
+    if (isSelected) window.addEventListener('canvas-styles-restored', listener);
+    return () => { unsubscribe(); if (isSelected) window.removeEventListener('canvas-styles-restored', listener); };
+  }, [id, isSelected, mountStore]);
+  const snapshot = useCallback(() => {
+    const workspace = document.getElementById('canvas-workspace');
+    const paused = getCanvasLoadingMode() === 'lazy' &&
+      ['data-gesture', 'data-panning', 'data-zooming'].some(name => workspace?.getAttribute(name) === 'true');
+    if (paused && isSelected && !admittedDom.current) return false;
+    return Boolean(mountStore.ids.has(id) || (isSelected && (admittedDom.current || !paused)));
+  }, [id, isSelected, mountStore]);
+  const mounted = useSyncExternalStore(subscribe, snapshot, snapshot);
+  if (useDomLod && mounted) admittedDom.current = true;
+  return (admittedDom.current || useDomLod) && mounted ? <GenerationCard {...props} /> : null;
 });
