@@ -62,10 +62,13 @@ export function registerCardEntries(projectId: string, cards: { id: string; x: n
 }
 // 3-Phase Physical Rhythm (820ms Total):
 // Stage 1 (0 <= t < 0.20, ~164ms): High-speed crash drop from 2.40x to 1.15x
-// Stage 2 (0.20 <= t < 0.88, ~558ms): Long deceleration hover to elevated 1.050x height
-// Stage 3 (0.88 <= t <= 1.00, ~98ms): Crisp, elevated "啪嗒" touchdown & snap lock (1.050x -> 0.992x impact -> 1.000x solid rest)
-export function sampleCardEntry(progress: number) {
-  const t = Math.max(0, Math.min(1, progress));
+// Stage 2 (0.20 <= t < 0.88, ~558ms): Long deceleration hover to elevated 1.050x height (105% of rest size)
+// Stage 3 (0.88 <= t <= 1.00, ~98ms): Crisp touchdown & snap lock (starts at exactly 1.050x / 105% -> 0.992x impact -> 1.000x solid rest)
+export function sampleCardEntry(progress: number, isSelected = false) {
+  let t = Math.max(0, Math.min(1, progress));
+  if (isSelected && t > 0.88) {
+    t = 0.88; // Hold at Stage 2 ending / Stage 3 opening height (1.050x) while selected
+  }
   let scale: number;
 
   if (t < 0.20) {
@@ -73,37 +76,37 @@ export function sampleCardEntry(progress: number) {
     const p1 = t / 0.20;
     scale = 2.40 - 1.25 * Math.pow(p1, 1.6);
   } else if (t < 0.88) {
-    // Stage 2: Long Time (558ms), Decelerates to elevated 1.050x pre-snap height
+    // Stage 2: Long Time (558ms), Decelerates to elevated 1.050x (105% size) pre-touchdown height
     const p2 = (t - 0.20) / 0.68;
     scale = 1.050 + 0.100 * Math.pow(1 - p2, 2.6);
   } else {
-    // Stage 3: Elevated "啪嗒" snap touchdown (98ms) from 1.050x height
+    // Stage 3: Touchdown landing process starting at exactly 1.050x (105% of rest size)
     const p3 = (t - 0.88) / 0.12;
     if (p3 < 0.5) {
       const sub = p3 / 0.5;
-      scale = 1.050 - 0.058 * (sub * sub);
+      scale = 1.050 - 0.058 * (sub * sub); // 1.050x -> 0.992x impact compression
     } else {
       const sub = (p3 - 0.5) / 0.5;
-      scale = 0.992 + 0.008 * (1 - (1 - sub) * (1 - sub));
+      scale = 0.992 + 0.008 * (1 - (1 - sub) * (1 - sub)); // 0.992x -> 1.000x solid rest
     }
   }
 
   const opacity = Math.min(1, t / 0.10);
   return { scale, opacity };
 }
-export function cardEntryFrame(id: string, now = performance.now(), keyframes = false) {
+export function cardEntryFrame(id: string, now = performance.now(), keyframes = false, isSelected = false) {
   const staged = stagedEntries.get(id);
   if (staged) {
-    const openingPose = sampleCardEntry(0);
-    return { pivotX: staged.x, pivotY: staged.y, ...openingPose, scales: [openingPose.scale], opacities: [openingPose.opacity], delay: 0, duration: 0, held: true };
+    const openingPose = sampleCardEntry(0, isSelected);
+    return { pivotX: staged.x, pivotY: staged.y, ...openingPose, opacity: 1, scales: [openingPose.scale], opacities: [1], delay: 0, duration: 0, held: true };
   }
   const group = entries.get(id);
   if (!group) return null;
   const start = group.start;
   if (now >= start + CARD_ENTRY_MS) { entries.delete(id); return null; }
   const progress = Math.max(0, (now - start) / CARD_ENTRY_MS);
-  const samples = keyframes ? Array.from({ length: 41 }, (_, i) => sampleCardEntry(progress + (1 - progress) * i / 40)) : [];
-  return { pivotX: group.x, pivotY: group.y, ...sampleCardEntry(progress), scales: samples.map(frame => frame.scale), opacities: samples.map(frame => frame.opacity), delay: Math.max(0, start - now) / 1000, duration: (1 - progress) * CARD_ENTRY_MS / 1000 };
+  const samples = keyframes ? Array.from({ length: 41 }, (_, i) => sampleCardEntry(progress + (1 - progress) * i / 40, isSelected)) : [];
+  return { pivotX: group.x, pivotY: group.y, ...sampleCardEntry(progress, isSelected), scales: samples.map(frame => frame.scale), opacities: samples.map(frame => frame.opacity), delay: Math.max(0, start - now) / 1000, duration: (1 - progress) * CARD_ENTRY_MS / 1000 };
 }
 
 // New cards at DOM scale wait for that renderer rather than showing a nano placeholder.

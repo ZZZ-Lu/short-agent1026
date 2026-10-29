@@ -42,6 +42,7 @@ import { buildAutoInjectedCardContext, buildMultiCardInjectedContext } from './a
 import { agentFocusManager, type AgentFocusSnapshot } from './agent/agentFocusManager';
 import { AnimatePresence, motion, useMotionValue, animate, useMotionValueEvent } from 'motion/react';
 import { CanvasGridBackground } from './components/CanvasGridBackground';
+import { CanvasSnapGuidesOverlay } from './components/CanvasSnapGuidesOverlay';
 
 const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
@@ -673,7 +674,16 @@ export default function App() {
   const [agentTask, setAgentTask] = useState<AgentTaskLog | null>(null);
   const agentTaskScrollRef = useRef<HTMLDivElement>(null);
   const [isTaskChatOpen, setIsTaskChatOpen] = useState(false);
-  const [isTaskPanelCollapsed, setIsTaskPanelCollapsed] = useState(false);
+  const [isTaskPanelCollapsed, setIsTaskPanelCollapsed] = useState<boolean>(() => {
+    if (typeof window !== 'undefined') {
+      const savedId = localStorage.getItem('current_project_id');
+      if (savedId) {
+        const saved = localStorage.getItem(`task_panel_collapsed_${savedId}`);
+        if (saved !== null) return saved === 'true';
+      }
+    }
+    return false;
+  });
   const [taskChatMessage, setTaskChatMessage] = useState('');
   const taskChatInputRef = useRef<HTMLInputElement>(null);
   
@@ -773,7 +783,18 @@ export default function App() {
 
   useEffect(() => {
     localStorage.setItem('current_project_id', currentProjectId);
+    if (currentProjectId) {
+      const saved = localStorage.getItem(`task_panel_collapsed_${currentProjectId}`);
+      if (saved !== null) {
+        setIsTaskPanelCollapsed(saved === 'true');
+      }
+    }
   }, [currentProjectId]);
+
+  useEffect(() => {
+    if (!currentProjectId) return;
+    localStorage.setItem(`task_panel_collapsed_${currentProjectId}`, String(isTaskPanelCollapsed));
+  }, [currentProjectId, isTaskPanelCollapsed]);
 
   const handleRenameProject = (projectId: string, newName: string) => {
     setProjects(prev => prev.map(p => p.id === projectId ? { ...p, name: newName, updatedAt: Date.now() } : p));
@@ -7783,6 +7804,7 @@ export default function App() {
 
       {/* Infinite Dotted Grid Background - Lifted outside of transform workspace to fix compositor memory crash */}
       <CanvasGridBackground tx={tx} ty={ty} scale={tScale} />
+      <CanvasSnapGuidesOverlay tx={tx} ty={ty} scale={tScale} />
 
       {/* Nano-LOD High Performance Hybrid Canvas Layer (Active when scale < 0.40 or during staggered DOM loading) */}
       {(() => {

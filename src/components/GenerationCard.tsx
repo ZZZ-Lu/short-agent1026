@@ -3367,9 +3367,9 @@ export const GenerationCard = React.memo(function GenerationCard({
   useEffect(() => {
     if (!openMenu) return;
     const closeMenu = (e: PointerEvent) => {
-      const target = e.target as Node;
-      const insideParamMenu = menuContainerRef.current && menuContainerRef.current.contains(target);
-      const insideRefMenu = refMenuContainerRef.current && refMenuContainerRef.current.contains(target);
+      const target = e.target instanceof Node ? e.target : null;
+      const insideParamMenu = Boolean(target && menuContainerRef.current?.contains(target));
+      const insideRefMenu = Boolean(target && refMenuContainerRef.current?.contains(target));
       if (!insideParamMenu && !insideRefMenu) {
         setOpenMenu(prev => {
           if (!prev) return null;
@@ -3451,10 +3451,38 @@ export const GenerationCard = React.memo(function GenerationCard({
       const dy = (moveEvent.clientY - lastPos.current.y) / currentScale;
       lastPos.current = { x: moveEvent.clientX, y: moveEvent.clientY };
       
-      posRef.current.x += dx;
-      posRef.current.y += dy;
       totalDx.current += dx;
       totalDy.current += dy;
+
+      const rawX = x + totalDx.current;
+      const rawY = y + totalDy.current;
+
+      // 48px Canvas Grid Strict Point Lock System
+      const GRID_STEP = 48;
+      const nearestGridX = Math.round(rawX / GRID_STEP) * GRID_STEP;
+      const nearestGridY = Math.round(rawY / GRID_STEP) * GRID_STEP;
+
+      let targetX = rawX;
+      let targetY = rawY;
+      let snappedLineX: number | null = null;
+      let snappedLineY: number | null = null;
+
+      // Hold Alt / Option key to temporarily disable strict grid locking for free movement
+      if (moveEvent.altKey) {
+        targetX = rawX;
+        targetY = rawY;
+      } else {
+        targetX = nearestGridX;
+        targetY = nearestGridY;
+        snappedLineX = nearestGridX;
+        snappedLineY = nearestGridY;
+      }
+
+      posRef.current.x = targetX;
+      posRef.current.y = targetY;
+
+      const effectiveDx = targetX - x;
+      const effectiveDy = targetY - y;
 
       // Lazy Degradation: Apply heavy style removal & global class toggle ONLY when actual movement starts!
       if (!didApplyDegrade && Math.hypot(totalDx.current, totalDy.current) > 1.5) {
@@ -3496,24 +3524,33 @@ export const GenerationCard = React.memo(function GenerationCard({
 
       // Update transient global drag delta for React-DOM seamless coordinate synchronization
       (window as any).__dragDelta = {
-        dx: totalDx.current,
-        dy: totalDy.current,
+        dx: effectiveDx,
+        dy: effectiveDy,
         draggingCardId: id
       };
       
       if (cardRef.current) {
-        cardRef.current.style.transform = `translate(${posRef.current.x}px, ${posRef.current.y}px)`;
+        cardRef.current.style.transform = `translate(${targetX}px, ${targetY}px)`;
       }
       
       slaveNodesRef.current.forEach(slave => {
-        slave.el.style.transform = `translate(${slave.initialX + totalDx.current}px, ${slave.initialY + totalDy.current}px)`;
+        slave.el.style.transform = `translate(${slave.initialX + effectiveDx}px, ${slave.initialY + effectiveDy}px)`;
       });
+
+      // Dispatch magnetic guide lines for visual feedback
+      window.dispatchEvent(new CustomEvent('canvas-snap-guides', {
+        detail: { x: snappedLineX, y: snappedLineY }
+      }));
+
       window.dispatchEvent(new CustomEvent('card-drag-move'));
     };
 
     const handleWindowPointerUp = (upEvent: PointerEvent) => {
       window.removeEventListener('pointermove', handleWindowPointerMove);
       window.removeEventListener('pointerup', handleWindowPointerUp);
+
+      // Clear magnetic snap guide lines
+      window.dispatchEvent(new CustomEvent('canvas-snap-guides', { detail: { x: null, y: null } }));
 
       // Clean up the transient global drag delta registry immediately
       (window as any).__dragDelta = null;
@@ -3535,15 +3572,18 @@ export const GenerationCard = React.memo(function GenerationCard({
       if (isDragging.current) {
         isDragging.current = false;
 
-        const movedDistance = Math.hypot(totalDx.current, totalDy.current);
+        const movedDistance = Math.hypot(posRef.current.x - x, posRef.current.y - y);
         if (movedDistance > 2) {
           // Keep effects degraded until the shared 300ms idle interval expires.
           if (typeof (window as any).resetGlobalZoomTimer === 'function') {
             (window as any).resetGlobalZoomTimer();
           }
 
+          const finalDx = posRef.current.x - x;
+          const finalDy = posRef.current.y - y;
+
           if (onDragEnd) {
-            onDragEnd(id, totalDx.current, totalDy.current);
+            onDragEnd(id, finalDx, finalDy);
           } else {
             onUpdate(id, { x: posRef.current.x, y: posRef.current.y }, true);
           }
@@ -4340,7 +4380,7 @@ export const GenerationCard = React.memo(function GenerationCard({
     if (!mentionMenuOpen) return;
 
     const handlePointerDownOutside = (e: MouseEvent | TouchEvent) => {
-      const target = e.target as Node | null;
+      const target = e.target instanceof Node ? e.target : null;
       if (!target) return;
       if (mentionMenuRef.current && mentionMenuRef.current.contains(target)) {
         return;
@@ -4510,11 +4550,13 @@ export const GenerationCard = React.memo(function GenerationCard({
   useEffect(() => {
     if (!mentionMenuOpen) return;
     const handleClickOutside = (e: MouseEvent) => {
+      const target = e.target instanceof Node ? e.target : null;
       if (
+        target &&
         mentionMenuRef.current &&
-        !mentionMenuRef.current.contains(e.target as Node) &&
+        !mentionMenuRef.current.contains(target) &&
         textareaRef.current &&
-        !textareaRef.current.contains(e.target as Node)
+        !textareaRef.current.contains(target)
       ) {
         setMentionMenuOpen(false);
       }
@@ -4726,17 +4768,27 @@ export const GenerationCard = React.memo(function GenerationCard({
     displayY = posRef.current.y;
   }
 
-  const [entryFrame, setEntryFrame] = useState(() => cardEntryFrame(id, performance.now(), true));
+  const [entryFrame, setEntryFrame] = useState(() => cardEntryFrame(id, performance.now(), true, isSelected));
   useEffect(() => {
     const handleEntryStart = (event: Event) => {
       const customEvent = event as CustomEvent<{ cardId: string }>;
       if (customEvent.detail?.cardId === id) {
-        setEntryFrame(cardEntryFrame(id, performance.now(), true));
+        setEntryFrame(cardEntryFrame(id, performance.now(), true, isSelected));
       }
     };
     window.addEventListener('card-entry-start', handleEntryStart as EventListener);
     return () => window.removeEventListener('card-entry-start', handleEntryStart as EventListener);
-  }, [id]);
+  }, [id, isSelected]);
+
+  useEffect(() => {
+    if (!entryFrame || entryFrame.held) return;
+    const durationMs = (entryFrame.duration || 0.82) * 1000 + (entryFrame.delay || 0) * 1000;
+    const timer = setTimeout(() => {
+      setEntryFrame(null);
+    }, Math.max(50, durationMs + 20));
+    return () => clearTimeout(timer);
+  }, [entryFrame]);
+
   return (
     <div 
       ref={cardRef}
@@ -4757,6 +4809,7 @@ export const GenerationCard = React.memo(function GenerationCard({
         onAnimationComplete={() => {
           if (entryFrame && !entryFrame.held && typeof window !== 'undefined') {
             window.dispatchEvent(new CustomEvent('card-entrance-complete', { detail: { cardId: id } }));
+            setEntryFrame(null);
           }
         }}
         transformTemplate={(_, generated) => generated.replace(/translateZ\([^)]+\)/g, '')}
@@ -4771,6 +4824,16 @@ export const GenerationCard = React.memo(function GenerationCard({
           onHover?.(null);
         }}
       >
+        <div 
+          className="card-selection-scaler w-full flex flex-col gap-3 items-start relative transition-all duration-200 ease-[cubic-bezier(0.16,1,0.3,1)]"
+          style={{
+            transform: isSelected ? 'scale(1.05)' : 'scale(1)',
+            transformOrigin: '50% 120px',
+            filter: (isSelected || Boolean(entryFrame))
+              ? 'drop-shadow(0 18px 30px rgba(0, 0, 0, 0.25)) drop-shadow(0 6px 12px rgba(0, 0, 0, 0.12))'
+              : 'none',
+          }}
+        >
         {/* Floating Top Toolbar Card (Only visible when card is selected, horizontally centered with squircle corners) */}
         <div 
           className="absolute bottom-full mb-2.5 left-0 flex justify-center pointer-events-none z-[70]"
@@ -4920,7 +4983,7 @@ export const GenerationCard = React.memo(function GenerationCard({
               : isAgentTarget
                 ? undefined // Allow beautiful classes with fluorescent glows in className to take precedence!
                 : isSelected 
-                  ? '0 20px 40px -8px rgba(0, 0, 0, 0.22)' 
+                  ? '0 20px 40px -8px rgba(59, 130, 246, 0.35), 0 12px 24px -6px rgba(0, 0, 0, 0.2)' 
                   : undefined,
             transitionProperty: 'box-shadow, border-color, width, height, outline-color, outline-width',
             transitionDuration: '180ms',
@@ -5528,10 +5591,10 @@ export const GenerationCard = React.memo(function GenerationCard({
       <div 
         onPointerEnter={() => setIsPromptPanelHovered(true)}
         onPointerLeave={() => setIsPromptPanelHovered(false)}
-        className={`generation-card-bottom-panel relative pointer-events-auto flex flex-col bg-gray-100 dark:bg-neutral-800 squircle p-4 gap-2 w-[480px] border border-gray-200/80 dark:border-[#404040] cursor-default self-start transform-gpu [&.drag-degraded]:!shadow-none [&.drag-degraded]:!backdrop-filter-none ${
+        className={`generation-card-bottom-panel relative pointer-events-auto flex flex-col bg-gray-100 dark:bg-neutral-800 squircle p-4 gap-2 w-[480px] cursor-default self-start transform-gpu [&.drag-degraded]:!shadow-none [&.drag-degraded]:!backdrop-filter-none ${
         isSelected 
-          ? 'shadow-[0_16px_36px_-6px_rgba(0,0,0,0.12),0_8px_16px_-4px_rgba(0,0,0,0.06)] dark:shadow-[0_20px_40px_-6px_rgba(0,0,0,0.45)]' 
-          : 'shadow-[0_1px_3px_rgba(0,0,0,0.05),0_1px_2px_rgba(0,0,0,0.03)] dark:shadow-none'
+          ? 'border border-gray-200/80 dark:border-[#404040] shadow-[0_16px_36px_-6px_rgba(0,0,0,0.12),0_8px_16px_-4px_rgba(0,0,0,0.06)] dark:shadow-[0_20px_40px_-6px_rgba(0,0,0,0.45)]' 
+          : 'ring-1 ring-inset ring-gray-200/90 dark:ring-[#404040]/90 shadow-[0_1px_2px_rgba(0,0,0,0.06),0_0_1px_rgba(0,0,0,0.08)] dark:shadow-[0_1px_2px_rgba(0,0,0,0.35)] hover:shadow-[0_3px_8px_rgba(0,0,0,0.08)] hover:ring-gray-300 dark:hover:ring-neutral-600'
       }`}
         style={{
           ...cardCornerStyle,
@@ -5550,8 +5613,8 @@ export const GenerationCard = React.memo(function GenerationCard({
           className="absolute -inset-x-10 -bottom-16 top-0 pointer-events-auto z-[-1]"
           onPointerEnter={() => setIsPromptPanelHovered(true)}
           onPointerLeave={(e) => {
-            const related = e.relatedTarget as Node | null;
-            if (!e.currentTarget.parentElement?.contains(related)) {
+            const related = e.relatedTarget;
+            if (!related || !(related instanceof Node) || !e.currentTarget.parentElement?.contains(related)) {
               setIsPromptPanelHovered(false);
             }
           }}
@@ -6168,6 +6231,7 @@ export const GenerationCard = React.memo(function GenerationCard({
         </>}
       </div>
       )}
+      </div>
       </motion.div>
 
       {/* Portal: Asset List Modal */}

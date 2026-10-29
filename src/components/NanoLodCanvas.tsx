@@ -569,7 +569,7 @@ export const NanoLodCanvas: React.FC<NanoLodCanvasProps> = React.memo(function N
     }
 
     const renderCard = (card: CardData) => {
-      const dim = getCardSize(card);
+      let dim = getCardSize(card);
 
       // --- CALCULATE REALTIME NANO DRAGGING OFFSET ---
       let cardX = card.x;
@@ -585,6 +585,14 @@ export const NanoLodCanvas: React.FC<NanoLodCanvasProps> = React.memo(function N
       }
 
       const isSelected = selectedIds.includes(card.id);
+      if (isSelected) {
+        const scaleFactor = 1.05;
+        const extraW = dim.width * (scaleFactor - 1);
+        const extraH = dim.height * (scaleFactor - 1);
+        cardX -= extraW / 2;
+        cardY -= extraH / 2;
+        dim = { width: dim.width * scaleFactor, height: dim.height * scaleFactor };
+      }
       // At standard scale, hand off only to DOM cards that are mounted and painted.
       const renderedSet = renderedIdsRef.current;
       const paintedSet = typeof window !== 'undefined' ? (window as any).__paintedCardIds : null;
