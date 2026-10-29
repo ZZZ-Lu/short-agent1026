@@ -23,7 +23,7 @@ export function requestCardEntries(
     }
   }
 }
-export const CARD_ENTRY_MS = 450;
+export const CARD_ENTRY_MS = 820;
 // Imported cards can be mounted in their opening pose while their media is prepared.
 export function stageCardEntry(projectId: string, item: { id: string; x: number; y: number; width: number; height: number }) {
   requested.set(item.id, projectId);
@@ -60,17 +60,36 @@ export function registerCardEntries(projectId: string, cards: { id: string; x: n
   // New cards retain their individual entry animation without blurring the page.
   return isProjectEntry && added.length > 0;
 }
-// Accelerate into the canvas, then give one small scale pulse on landing.
+// 3-Phase Physical Rhythm (820ms Total):
+// Stage 1 (0 <= t < 0.20, ~164ms): High-speed crash drop from 2.40x to 1.15x
+// Stage 2 (0.20 <= t < 0.88, ~558ms): Long deceleration hover to elevated 1.050x height
+// Stage 3 (0.88 <= t <= 1.00, ~98ms): Crisp, elevated "啪嗒" touchdown & snap lock (1.050x -> 0.992x impact -> 1.000x solid rest)
 export function sampleCardEntry(progress: number) {
   const t = Math.max(0, Math.min(1, progress));
-  const smooth = (v: number) => v * v * (3 - 2 * v);
-  // Land at 72%, expand gently to 101.8%, then settle at normal size.
-  const scale = t < 0.72
-    ? 1 + 0.38 * (1 - Math.pow(t / 0.72, 4))
-    : t < 0.86
-      ? 1 + 0.018 * smooth((t - 0.72) / 0.14)
-      : 1 + 0.018 * (1 - smooth((t - 0.86) / 0.14));
-  return { scale, opacity: 1 };
+  let scale: number;
+
+  if (t < 0.20) {
+    // Stage 1: Short Time (164ms), Long Distance (2.40x -> 1.15x)
+    const p1 = t / 0.20;
+    scale = 2.40 - 1.25 * Math.pow(p1, 1.6);
+  } else if (t < 0.88) {
+    // Stage 2: Long Time (558ms), Decelerates to elevated 1.050x pre-snap height
+    const p2 = (t - 0.20) / 0.68;
+    scale = 1.050 + 0.100 * Math.pow(1 - p2, 2.6);
+  } else {
+    // Stage 3: Elevated "啪嗒" snap touchdown (98ms) from 1.050x height
+    const p3 = (t - 0.88) / 0.12;
+    if (p3 < 0.5) {
+      const sub = p3 / 0.5;
+      scale = 1.050 - 0.058 * (sub * sub);
+    } else {
+      const sub = (p3 - 0.5) / 0.5;
+      scale = 0.992 + 0.008 * (1 - (1 - sub) * (1 - sub));
+    }
+  }
+
+  const opacity = Math.min(1, t / 0.10);
+  return { scale, opacity };
 }
 export function cardEntryFrame(id: string, now = performance.now(), keyframes = false) {
   const staged = stagedEntries.get(id);
