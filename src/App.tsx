@@ -1,5 +1,5 @@
 import { EntryBlurOverlay } from './components/EntryBlurOverlay';
-import { registerCardEntries, requestCardEntries, stageCardEntry, startCardEntry, CARD_ENTRY_MS, isNewCardAwaitingLod } from './utils/cardEntrance';
+import { registerCardEntries, requestCardEntries, stageCardEntry, startCardEntry, startMediaReveal, mediaRevealProgress, MEDIA_REVEAL_MS, CARD_ENTRY_MS, isNewCardAwaitingLod } from './utils/cardEntrance';
 import React, { useRef, useState, useEffect, useCallback, useMemo } from 'react';
 import { AgentCursor, buildDynamicSelectionPrompt, HudContextMessage } from './components/AgentCursor';
 import { AgentContextMenu } from './components/AgentContextMenu';
@@ -2559,6 +2559,7 @@ export default function App() {
           closeupThumbnailUrl = await generateImportThumbnail(posterBlob, 256);
           thumbnailUrl = closeupThumbnailUrl;
           await warmCanvasImage(closeupThumbnailUrl);
+          startMediaReveal(card.id);
           // Paint a tiny poster first so the card does not upload a video frame and animate
           // in the same frame. Keep the import overlay until all video assets are ready.
           setCards(prev => prev.map(existing => existing.id === card.id ? {
@@ -2575,6 +2576,7 @@ export default function App() {
           closeupThumbnailUrl = await generateImportThumbnail(processedFile, 256);
           thumbnailUrl = closeupThumbnailUrl;
           await warmCanvasImage(closeupThumbnailUrl);
+          startMediaReveal(card.id);
           // Show the small preview under the import indicator while the other LODs load.
           setCards(prev => prev.map(existing => existing.id === card.id ? {
             ...existing, imageUrl: closeupThumbnailUrl, thumbnailUrl,
@@ -2613,9 +2615,16 @@ export default function App() {
         await warmCanvasImage(originalImageUrl, 'original');
       }
       await yieldToMain();
+      startMediaReveal(card.id);
+      const remainingReveal = (1 - mediaRevealProgress(card.id)) * MEDIA_REVEAL_MS;
+      if (remainingReveal > 0 && closeupThumbnailUrl) await new Promise(resolve => setTimeout(resolve, remainingReveal));
       setCards(prev => prev.map(existing => existing.id === card.id ? importingCard : existing), false);
       await yieldToMain();
       await yieldToMain();
+      if (!closeupThumbnailUrl) {
+        const remainingFallbackReveal = (1 - mediaRevealProgress(card.id)) * MEDIA_REVEAL_MS;
+        if (remainingFallbackReveal > 0) await new Promise(resolve => setTimeout(resolve, remainingFallbackReveal));
+      }
 
       // Finish import and let the canvas paint the ready image before the entrance animation.
       const entranceComplete = waitForCardEntrance(card.id);

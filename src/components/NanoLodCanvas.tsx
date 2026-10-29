@@ -1,4 +1,4 @@
-import { cardEntryFrame, waitForEntryDom } from '../utils/cardEntrance';
+import { cardEntryFrame, waitForEntryDom, mediaRevealProgress } from '../utils/cardEntrance';
 import { calculateVideoPlayButtonDimensions, getPlayIconPath2D } from "../utils/videoPlayButton";
 import { getLiveVideoFrame } from '../utils/videoFrameBus';
 import { getCanvasLoadingMode } from '../utils/canvasPerformance';
@@ -732,7 +732,12 @@ export const NanoLodCanvas: React.FC<NanoLodCanvasProps> = React.memo(function N
           dim.width,
           dim.height
         );
+        const reveal = mediaRevealProgress(card.id);
+        ctx.save();
+        ctx.globalAlpha *= reveal;
         ctx.drawImage(drawSourceImg, sx, sy, sw, sh, cardX, cardY, dim.width, dim.height);
+        ctx.restore();
+        if (reveal < 1) scheduleDraw();
         // Apply the single bg-black/25 overlay used by Micro LOD.
         // The play badge below must not darken the whole card a second time.
         if (card.isVideo) {
@@ -957,7 +962,7 @@ export const NanoLodCanvas: React.FC<NanoLodCanvasProps> = React.memo(function N
           (card.fileName || card.isAsset || readyPromptPanels.has(card.id)));
         if (waitForEntryDom(card.id, domReady)) return;
       }
-      const entry = cardEntryFrame(card.id);
+      const entry = cardEntryFrame(card.id, performance.now(), false, selectedIds.includes(card.id));
       if (!entry || dragging) { renderCard(card); return; }
       animating = true;
       const cx = entry.pivotX;

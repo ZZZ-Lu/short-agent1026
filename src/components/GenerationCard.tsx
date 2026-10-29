@@ -1,4 +1,4 @@
-import { cardEntryFrame } from '../utils/cardEntrance';
+import { cardEntryFrame, isStagedMediaEntry, MEDIA_REVEAL_MS } from '../utils/cardEntrance';
 import { calculateVideoPlayButtonDimensions, PLAY_BUTTON_SVG_PATH } from "../utils/videoPlayButton";
 import React, { useState, useRef, useEffect, useLayoutEffect, useCallback, useMemo } from 'react';
 import { createPortal } from 'react-dom';
@@ -5441,7 +5441,10 @@ export const GenerationCard = React.memo(function GenerationCard({
               </div>
             </div>
           ) : (
-            <div 
+            <motion.div 
+              initial={isStagedMediaEntry(id) ? { opacity: 0 } : false}
+              animate={{ opacity: 1 }}
+              transition={{ duration: MEDIA_REVEAL_MS / 1000 }}
               className="absolute inset-0 overflow-hidden squircle pointer-events-auto"
               style={{
                 width: w,
@@ -5465,7 +5468,7 @@ export const GenerationCard = React.memo(function GenerationCard({
                 onLoaded={handleImageLoaded}
                 className="squircle"
               />
-            </div>
+            </motion.div>
           )
         )}
 
