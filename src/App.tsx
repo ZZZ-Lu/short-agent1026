@@ -543,6 +543,26 @@ export default function App() {
     });
   }, [tScale, tx, ty]);
 
+  // Keep the cursor reticle anchored to the pointer while the camera animates.
+  useEffect(() => {
+    if (!isOverviewMode) return;
+    let frame: number | null = null;
+    const schedule = () => {
+      if (frame !== null) return;
+      frame = requestAnimationFrame(() => {
+        frame = null;
+        const { clientX, clientY } = lastMouseClientPosRef.current;
+        updateOverviewCursorBoxAt(clientX, clientY);
+      });
+    };
+    const subscriptions = [tx, ty, tScale].map(value => value.on('change', schedule));
+    schedule();
+    return () => {
+      subscriptions.forEach(unsubscribe => unsubscribe());
+      if (frame !== null) cancelAnimationFrame(frame);
+    };
+  }, [isOverviewMode, tx, ty, tScale, updateOverviewCursorBoxAt]);
+
   useEffect(() => {
     const handleGlobalMouseMove = (e: MouseEvent) => {
       lastMouseClientPosRef.current = { clientX: e.clientX, clientY: e.clientY };
@@ -6606,10 +6626,7 @@ export default function App() {
     // Immediately calculate and display the blue viewport box at current mouse position
     updateOverviewCursorBoxAt(
       lastMouseClientPosRef.current.clientX,
-      lastMouseClientPosRef.current.clientY,
-      targetTx,
-      targetTy,
-      targetScale
+      lastMouseClientPosRef.current.clientY
     );
   }, [tScale, tx, ty, restoreCanvasStyles, resetOverviewPrompt, updateOverviewCursorBoxAt]);
 
@@ -6991,7 +7008,9 @@ export default function App() {
     ));
 
   const onPointerDown = (e: React.PointerEvent) => {
-    if (isCanvasOverlayTarget(e.target)) return;
+    const isPromptPanelMiddleClick = e.button === 1 && e.target instanceof Element &&
+      Boolean(e.target.closest('.generation-card-bottom-panel'));
+    if (!isPromptPanelMiddleClick && isCanvasOverlayTarget(e.target)) return;
     const rect = containerRef.current?.getBoundingClientRect();
     if (!rect) return;
 
@@ -7588,6 +7607,12 @@ export default function App() {
       data-agent-actions="mouse.move mouse.hover mouse.drag mouse.scroll mouse.click mouse.doubleClick"
       className={`w-screen h-screen overflow-hidden bg-[#e7e7e7] dark:bg-[#1c1c1e] relative select-none touch-none ${isOverviewMode ? 'overview-active-mode' : ''}`}
       onPointerDownCapture={(e) => {
+        if (e.button === 1 && e.target instanceof Element && e.target.closest('.generation-card-bottom-panel')) {
+          e.preventDefault();
+          e.stopPropagation();
+          onPointerDown(e);
+          return;
+        }
         if (isCanvasOverlayTarget(e.target)) return;
         // If in overview mode and user left-clicks, navigate and dive down into the clicked position!
         if (e.button === 0 && (preOverviewTransform.current || isOverviewModeRef.current)) {
@@ -7909,7 +7934,7 @@ export default function App() {
           {overviewViewportBox && (
             <motion.div
               key="overview-viewport-indicator"
-              initial={{ opacity: 0.9 }}
+              initial={{ opacity: 1 }}
               animate={{ opacity: isOverviewMode ? 1 : 0 }}
               exit={{ opacity: 0 }}
               transition={{ duration: 0.38, ease: [0.16, 1, 0.3, 1] }}
@@ -7919,9 +7944,9 @@ export default function App() {
                 top: overviewViewportBox.y,
                 width: overviewViewportBox.width,
                 height: overviewViewportBox.height,
-                borderWidth: 'calc(2px / var(--current-scale, 1))',
+                borderWidth: 'calc(2px / var(--selection-scale, 1))',
                 borderRadius: 0,
-                boxShadow: '0 0 0 calc(1px / var(--current-scale, 1)) rgba(59, 130, 246, 0.25)',
+                boxShadow: '0 0 0 calc(1px / var(--selection-scale, 1)) rgba(59, 130, 246, 0.25)',
               }}
             />
           )}
@@ -7937,9 +7962,9 @@ export default function App() {
               top: overviewCursorBox.y,
               width: overviewCursorBox.width,
               height: overviewCursorBox.height,
-              borderWidth: 'calc(2px / var(--current-scale, 1))',
+              borderWidth: 'calc(2px / var(--selection-scale, 1))',
               borderRadius: 0,
-              boxShadow: '0 0 0 calc(1px / var(--current-scale, 1)) rgba(59, 130, 246, 0.25)',
+              boxShadow: '0 0 0 calc(1px / var(--selection-scale, 1)) rgba(59, 130, 246, 0.25)',
             }}
           />
         )}
