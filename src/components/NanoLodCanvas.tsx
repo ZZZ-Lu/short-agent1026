@@ -659,6 +659,16 @@ export const NanoLodCanvas: React.FC<NanoLodCanvasProps> = React.memo(function N
         ? currentScale >= getNanoLodThreshold() && !lazyGesture
         : isStandardCardLod(currentScale);
       if (standard) {
+        // Draw card subtle ambient shadow on 2D Canvas before clipping inner media fill
+        ctx.save();
+        ctx.shadowColor = dark ? 'rgba(0, 0, 0, 0.35)' : 'rgba(0, 0, 0, 0.08)';
+        ctx.shadowBlur = 3 * currentScale;
+        ctx.shadowOffsetY = 1 * currentScale;
+        ctx.fillStyle = dark ? '#262626' : '#ffffff';
+        strokeCardOutline(ctx, cardX, cardY, dim.width, dim.height, true, squircleSupported);
+        ctx.fill(cardOutline(dim.width, dim.height, true, squircleSupported));
+        ctx.restore();
+
         ctx.save();
         ctx.translate(cardX, cardY);
         ctx.clip(cardOutline(dim.width, dim.height, true, squircleSupported));

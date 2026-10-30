@@ -4829,9 +4829,11 @@ export const GenerationCard = React.memo(function GenerationCard({
           style={{
             transform: isSelected ? 'scale(1.05)' : 'scale(1)',
             transformOrigin: '50% 120px',
-            filter: (isSelected || Boolean(entryFrame))
+            filter: isSelected
               ? 'drop-shadow(0 18px 30px rgba(0, 0, 0, 0.25)) drop-shadow(0 6px 12px rgba(0, 0, 0, 0.12))'
-              : 'none',
+              : Boolean(entryFrame)
+                ? 'drop-shadow(0 18px 30px rgba(0, 0, 0, 0.25))'
+                : 'drop-shadow(0 8px 20px rgba(0, 0, 0, 0.08)) drop-shadow(0 2px 6px rgba(0, 0, 0, 0.04))',
           }}
         >
         {/* Floating Top Toolbar Card (Only visible when card is selected, horizontally centered with squircle corners) */}
@@ -5571,6 +5573,20 @@ export const GenerationCard = React.memo(function GenerationCard({
               }
             });
           }}
+        />
+
+        {/* Card Edge Ring & Border Overlay (1px solid border drawn ON TOP of image/video canvas to seal outer edges and prevent image bleed) */}
+        <div 
+          className={`card-edge-ring-overlay absolute inset-0 pointer-events-none z-[25] squircle transition-colors duration-180 ease-out ${
+            pickerSelectionIndex && pickerSelectionIndex > 0
+              ? 'border-0'
+              : isAgentTarget || isPickerTarget || isSelected
+                ? 'border-0'
+                : isPickerSelectable
+                  ? 'border border-gray-300 dark:border-neutral-600 group-hover:border-blue-400 dark:group-hover:border-blue-400/80'
+                  : 'border border-gray-200/90 dark:border-[#404040]/90 group-hover:border-gray-300 dark:group-hover:border-neutral-600'
+          }`}
+          style={cardCornerStyle}
         />
 
         {/* Dual Co-Presence Border Overlay (Half User Blue #3b82f6 + Half Agent Purple #a45cf8) */}
