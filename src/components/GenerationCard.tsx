@@ -4865,7 +4865,9 @@ export const GenerationCard = React.memo(function GenerationCard({
             width: w,
             height: h,
             ...cardCornerStyle,
-            filter: 'drop-shadow(0 3px 8px rgba(0, 0, 0, 0.08))',
+            filter: isPickerSelectable
+              ? 'drop-shadow(0 8px 16px rgba(59, 130, 246, 0.25))'
+              : 'drop-shadow(0 3px 8px rgba(0, 0, 0, 0.08))',
           }}
         />
 
@@ -4995,7 +4997,7 @@ export const GenerationCard = React.memo(function GenerationCard({
                   : isPickerTarget
                     ? 'shadow-[0_20px_40px_-8px_rgba(0,0,0,0.2),0_12px_24px_-6px_rgba(0,0,0,0.12)] dark:shadow-[0_24px_48px_-8px_rgba(0,0,0,0.6)]'
                     : isPickerSelectable
-                      ? 'ring-1 ring-inset ring-gray-300 dark:ring-neutral-600 shadow-[0_1px_3px_rgba(0,0,0,0.1)] translate-y-0 hover:shadow-[0_8px_16px_rgba(59,130,246,0.25)] hover:ring-blue-400 dark:hover:ring-blue-400/80 hover:outline hover:outline-2 hover:outline-blue-400/50 cursor-pointer'
+                      ? 'ring-1 ring-inset ring-gray-300 dark:ring-neutral-600 shadow-[0_1px_3px_rgba(0,0,0,0.1)] translate-y-0 hover:ring-blue-400 dark:hover:ring-blue-400/80 hover:outline hover:outline-2 hover:outline-blue-400/50 cursor-pointer'
                       : 'ring-1 ring-inset ring-gray-200/90 dark:ring-[#404040]/90 shadow-[0_1px_2px_rgba(0,0,0,0.06),0_0_1px_rgba(0,0,0,0.08)] dark:shadow-[0_1px_2px_rgba(0,0,0,0.35)] translate-y-0 hover:ring-gray-300 dark:hover:ring-neutral-600'
           }`}
           style={{
