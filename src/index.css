@@ -269,3 +269,34 @@ canvas,
   will-change: transform;
   backface-visibility: hidden;
 }
+
+/* Card shadow layers (counterparts live in GenerationCard.tsx).
+   The blur is rasterized once into dedicated EMPTY elements, so no filter ever wraps the
+   card subtree. Only `opacity` animates, keeping hover / selection transitions on the
+   compositor instead of triggering a repaint or a re-blur every frame. */
+.card-shadow-layer {
+  opacity: 0;
+  transition-property: opacity;
+  transition-duration: 200ms;
+  transition-timing-function: cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* Mirrors the old `hover:shadow-*` classes: only when the card is NOT already selected,
+   which is exactly how the previous className branches behaved. */
+[data-selected="false"] .card-selection-scaler:has(> .generation-card-body:hover) > .card-shadow-hover,
+[data-selected="false"] .generation-card-bottom-panel:hover > .card-shadow-hover {
+  opacity: 1;
+}
+
+/* During canvas gestures, card drags, and low LOD, skip the shadow work entirely. */
+#canvas-workspace[data-zooming="true"] .card-shadow-layer,
+#canvas-workspace[data-panning="true"] .card-shadow-layer,
+#canvas-workspace[data-gesture="true"] .card-shadow-layer,
+#canvas-workspace[data-scale-micro="true"] .card-shadow-layer,
+#canvas-workspace[data-scale-nano="true"] .card-shadow-layer,
+.card-selection-scaler:has(> .drag-degraded) > .card-shadow-layer,
+.generation-card-bottom-panel.drag-degraded > .card-shadow-layer {
+  opacity: 0 !important;
+  filter: none !important;
+  transition: none !important;
+}

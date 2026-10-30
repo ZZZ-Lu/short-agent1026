@@ -4796,7 +4796,7 @@ export const GenerationCard = React.memo(function GenerationCard({
       data-agent-target={`canvas.card.${id}`}
       data-agent-actions="mouse.move mouse.click mouse.doubleClick mouse.hover mouse.drag"
       data-selected={isSelected ? 'true' : 'false'}
-      className={`absolute top-0 left-0 pointer-events-none will-change-transform ${isSelected || isAgentTarget ? 'z-10' : 'z-0'}`}
+      className={`absolute top-0 left-0 pointer-events-none ${isSelected || isAgentTarget ? 'z-10' : 'z-0'}`}
       style={{ transformOrigin: 'top left', transform: `translate(${displayX}px, ${displayY}px)` }}
       onPointerDownCapture={handleContainerPointerDown}
     >
@@ -4825,17 +4825,50 @@ export const GenerationCard = React.memo(function GenerationCard({
         }}
       >
         <div 
-          className="card-selection-scaler w-full flex flex-col gap-3 items-start relative transition-all duration-200 ease-[cubic-bezier(0.16,1,0.3,1)]"
+          className="card-selection-scaler w-full flex flex-col gap-3 items-start relative transition-transform duration-200 ease-[cubic-bezier(0.16,1,0.3,1)]"
           style={{
             transform: isSelected ? 'scale(1.05)' : 'scale(1)',
             transformOrigin: '50% 120px',
-            filter: isSelected
-              ? 'drop-shadow(0 18px 30px rgba(0, 0, 0, 0.25)) drop-shadow(0 6px 12px rgba(0, 0, 0, 0.12))'
-              : Boolean(entryFrame)
-                ? 'drop-shadow(0 18px 30px rgba(0, 0, 0, 0.25))'
-                : 'drop-shadow(0 8px 20px rgba(0, 0, 0, 0.08)) drop-shadow(0 2px 6px rgba(0, 0, 0, 0.04))',
           }}
         >
+        {/* Ambient (idle) shadow — upstream renders this at rest. Also moved off the scaler
+            so it never filters the card subtree; it is static, so nothing re-blurs. */}
+        <div
+          aria-hidden
+          className="card-shadow-layer pointer-events-none absolute left-0 top-0 squircle bg-gray-100 dark:bg-neutral-800"
+          style={{
+            width: w,
+            height: h,
+            ...cardCornerStyle,
+            filter: 'drop-shadow(0 8px 20px rgba(0, 0, 0, 0.08)) drop-shadow(0 2px 6px rgba(0, 0, 0, 0.04))',
+            opacity: (isSelected || Boolean(entryFrame)) ? 0 : 1,
+          }}
+        />
+        {/* Perf: static shadow layers. The blur lives on dedicated EMPTY elements behind the card,
+            so no filter ever wraps the card subtree (canvas / video / real prompt-panel DOM).
+            Only opacity animates, which the compositor handles without repainting or re-blurring. */}
+        <div
+          aria-hidden
+          className="card-shadow-layer pointer-events-none absolute left-0 top-0 squircle bg-gray-100 dark:bg-neutral-800"
+          style={{
+            width: w,
+            height: h,
+            ...cardCornerStyle,
+            filter: 'drop-shadow(0 18px 30px rgba(0, 0, 0, 0.25)) drop-shadow(0 6px 12px rgba(0, 0, 0, 0.12))',
+            opacity: (isSelected || Boolean(entryFrame)) ? 1 : 0,
+          }}
+        />
+        <div
+          aria-hidden
+          className="card-shadow-layer card-shadow-hover pointer-events-none absolute left-0 top-0 squircle bg-gray-100 dark:bg-neutral-800"
+          style={{
+            width: w,
+            height: h,
+            ...cardCornerStyle,
+            filter: 'drop-shadow(0 3px 8px rgba(0, 0, 0, 0.08))',
+          }}
+        />
+
         {/* Floating Top Toolbar Card (Only visible when card is selected, horizontally centered with squircle corners) */}
         <div 
           className="absolute bottom-full mb-2.5 left-0 flex justify-center pointer-events-none z-[70]"
@@ -4958,12 +4991,12 @@ export const GenerationCard = React.memo(function GenerationCard({
               : isAgentTarget
                 ? 'shadow-[0_0_25px_rgba(168,85,247,0.45),0_20px_40px_-8px_rgba(0,0,0,0.18)] dark:shadow-[0_0_30px_rgba(168,85,247,0.55),0_24px_48px_-8px_rgba(0,0,0,0.65)] translate-y-0'
                 : isSelected 
-                  ? 'shadow-[0_20px_40px_-8px_rgba(0,0,0,0.2),0_12px_24px_-6px_rgba(0,0,0,0.12)] dark:shadow-[0_24px_48px_-8px_rgba(0,0,0,0.6)] translate-y-0' 
+                  ? 'translate-y-0' 
                   : isPickerTarget
                     ? 'shadow-[0_20px_40px_-8px_rgba(0,0,0,0.2),0_12px_24px_-6px_rgba(0,0,0,0.12)] dark:shadow-[0_24px_48px_-8px_rgba(0,0,0,0.6)]'
                     : isPickerSelectable
                       ? 'ring-1 ring-inset ring-gray-300 dark:ring-neutral-600 shadow-[0_1px_3px_rgba(0,0,0,0.1)] translate-y-0 hover:shadow-[0_8px_16px_rgba(59,130,246,0.25)] hover:ring-blue-400 dark:hover:ring-blue-400/80 hover:outline hover:outline-2 hover:outline-blue-400/50 cursor-pointer'
-                      : 'ring-1 ring-inset ring-gray-200/90 dark:ring-[#404040]/90 shadow-[0_1px_2px_rgba(0,0,0,0.06),0_0_1px_rgba(0,0,0,0.08)] dark:shadow-[0_1px_2px_rgba(0,0,0,0.35)] translate-y-0 hover:shadow-[0_3px_8px_rgba(0,0,0,0.08)] hover:ring-gray-300 dark:hover:ring-neutral-600'
+                      : 'ring-1 ring-inset ring-gray-200/90 dark:ring-[#404040]/90 shadow-[0_1px_2px_rgba(0,0,0,0.06),0_0_1px_rgba(0,0,0,0.08)] dark:shadow-[0_1px_2px_rgba(0,0,0,0.35)] translate-y-0 hover:ring-gray-300 dark:hover:ring-neutral-600'
           }`}
           style={{
             ...cardCornerStyle,
@@ -4982,12 +5015,10 @@ export const GenerationCard = React.memo(function GenerationCard({
                     : '0px',
             boxShadow: pickerSelectionIndex && pickerSelectionIndex > 0
               ? '0 12px 30px rgba(37, 99, 235, 0.45)'
-              : isAgentTarget
-                ? undefined // Allow beautiful classes with fluorescent glows in className to take precedence!
-                : isSelected 
-                  ? '0 20px 40px -8px rgba(59, 130, 246, 0.35), 0 12px 24px -6px rgba(0, 0, 0, 0.2)' 
+                : isAgentTarget
+                  ? undefined // Allow beautiful classes with fluorescent glows in className to take precedence!
                   : undefined,
-            transitionProperty: 'box-shadow, border-color, width, height, outline-color, outline-width',
+            transitionProperty: 'box-shadow, border-color, outline-color, outline-width',
             transitionDuration: '180ms',
             transitionTimingFunction: 'ease-out'
           }}
@@ -5612,8 +5643,8 @@ export const GenerationCard = React.memo(function GenerationCard({
         onPointerLeave={() => setIsPromptPanelHovered(false)}
         className={`generation-card-bottom-panel relative pointer-events-auto flex flex-col bg-gray-100 dark:bg-neutral-800 squircle p-4 gap-2 w-[480px] cursor-default self-start transform-gpu [&.drag-degraded]:!shadow-none [&.drag-degraded]:!backdrop-filter-none ${
         isSelected 
-          ? 'border border-gray-200/80 dark:border-[#404040] shadow-[0_16px_36px_-6px_rgba(0,0,0,0.12),0_8px_16px_-4px_rgba(0,0,0,0.06)] dark:shadow-[0_20px_40px_-6px_rgba(0,0,0,0.45)]' 
-          : 'ring-1 ring-inset ring-gray-200/90 dark:ring-[#404040]/90 shadow-[0_1px_2px_rgba(0,0,0,0.06),0_0_1px_rgba(0,0,0,0.08)] dark:shadow-[0_1px_2px_rgba(0,0,0,0.35)] hover:shadow-[0_3px_8px_rgba(0,0,0,0.08)] hover:ring-gray-300 dark:hover:ring-neutral-600'
+          ? 'border border-gray-200/80 dark:border-[#404040]' 
+          : 'ring-1 ring-inset ring-gray-200/90 dark:ring-[#404040]/90 shadow-[0_1px_2px_rgba(0,0,0,0.06),0_0_1px_rgba(0,0,0,0.08)] dark:shadow-[0_1px_2px_rgba(0,0,0,0.35)] hover:ring-gray-300 dark:hover:ring-neutral-600'
       }`}
         style={{
           ...cardCornerStyle,
@@ -5627,6 +5658,24 @@ export const GenerationCard = React.memo(function GenerationCard({
           pointerEvents: hasPresentedPanel || showNativePromptPanel ? undefined : 'none',
         }}
       >
+        {/* Perf: same static-shadow-layer treatment as the card body above. */}
+        <div
+          aria-hidden
+          className="card-shadow-layer pointer-events-none absolute inset-0 -z-10 squircle bg-gray-100 dark:bg-neutral-800"
+          style={{
+            ...cardCornerStyle,
+            filter: 'drop-shadow(0 16px 36px rgba(0, 0, 0, 0.12)) drop-shadow(0 8px 16px rgba(0, 0, 0, 0.06))',
+            opacity: isSelected ? 1 : 0,
+          }}
+        />
+        <div
+          aria-hidden
+          className="card-shadow-layer card-shadow-hover pointer-events-none absolute inset-0 -z-10 squircle bg-gray-100 dark:bg-neutral-800"
+          style={{
+            ...cardCornerStyle,
+            filter: 'drop-shadow(0 3px 8px rgba(0, 0, 0, 0.08))',
+          }}
+        />
         {/* Proximity trigger zone: pre-hydrates prompt panel when cursor approaches within 60px */}
         <div 
           className="absolute -inset-x-10 -bottom-16 top-0 pointer-events-auto z-[-1]"
