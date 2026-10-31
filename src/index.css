@@ -270,6 +270,13 @@ canvas,
   backface-visibility: hidden;
 }
 
+/* The selection lift animates a scale on this wrapper. Keeping it promoted lets the
+   compositor scale the cached texture instead of re-rasterizing the whole card subtree
+   at the new scale — which is very expensive once the canvas is zoomed in. */
+.card-selection-scaler {
+  will-change: transform;
+}
+
 /* Card shadow layers (counterparts live in GenerationCard.tsx).
    The blur is rasterized once into dedicated EMPTY elements, so no filter ever wraps the
    card subtree. Only `opacity` animates, keeping hover / selection transitions on the

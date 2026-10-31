@@ -4833,10 +4833,7 @@ export const GenerationCard = React.memo(function GenerationCard({
         <div 
           className="card-selection-scaler w-full flex flex-col gap-3 items-start relative transition-transform duration-200 ease-[cubic-bezier(0.16,1,0.3,1)]"
           style={{
-            // The 5% selection bump forces the browser to re-raster the whole card at a new
-            // scale. Once the canvas is zoomed past 200% that raster is enormous and the bump
-            // is barely perceptible, so skip it there and keep the click cheap.
-            transform: isSelected && (currentScale || 1) < 2 ? 'scale(1.05)' : 'scale(1)',
+            transform: isSelected ? 'scale(1.05)' : 'scale(1)',
             transformOrigin: '50% 120px',
           }}
         >
