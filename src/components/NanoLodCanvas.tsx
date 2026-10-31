@@ -2,6 +2,7 @@ import { cardEntryFrame, waitForEntryDom, mediaRevealProgress } from '../utils/c
 import { calculateVideoPlayButtonDimensions, getPlayIconPath2D } from "../utils/videoPlayButton";
 import { getLiveVideoFrame } from '../utils/videoFrameBus';
 import { getCanvasLoadingMode } from '../utils/canvasPerformance';
+import { getCappedDpr } from '../utils/devicePixelBudget';
 import React, { useEffect, useRef } from 'react';
 import { readyPromptPanels } from '../utils/promptSurfaceCache';
 import { cardOutline, strokeCardOutline, drawEmptyCardIcon, isStandardCardLod } from '../utils/cardLodAppearance';
@@ -415,10 +416,12 @@ export const NanoLodCanvas: React.FC<NanoLodCanvasProps> = React.memo(function N
       ['data-gesture', 'data-panning', 'data-zooming'].some(name => workspace?.getAttribute(name) === 'true');
     const currentTx = tx.get();
     const currentTy = ty.get();
-    const dpr = window.devicePixelRatio || 1;
-
     const width = window.innerWidth;
     const height = window.innerHeight;
+    // This is a full-viewport canvas that is cleared and repainted on every gesture frame.
+    // At DPR 2 on a 2560x1440 window the backing store alone is ~14.7M pixels, which is
+    // pure per-frame fill cost. Cap it instead of trusting devicePixelRatio blindly.
+    const dpr = getCappedDpr(width, height, 1.5);
 
     // Adjust canvas resolution if viewport size changed
     const targetW = Math.round(width * dpr);

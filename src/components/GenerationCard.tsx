@@ -31,6 +31,7 @@ import { CardImageCanvas } from './CardImageCanvas';
 import { PromptCanvas } from './PromptCanvas';
 import { readyPromptPanels, getCardSurfaceRevision } from '../utils/promptSurfaceCache';
 import { cardCornerStyle, CARD_PANEL_WIDTH, EMPTY_CARD_PATHS } from '../utils/cardLodAppearance';
+import { capDprToBudget } from '../utils/devicePixelBudget';
 import { getStandardReferencePreview, resolveReferencePreviewSource } from '../utils/referencePreview';
 import { referenceDisplayName, shortenReferenceMentions } from '../utils/referenceName';
 import { PromptPanelCanvas, type PanelControl } from './PromptPanelCanvas';
@@ -3314,11 +3315,16 @@ export const GenerationCard = React.memo(function GenerationCard({
   }, [scale, tx, ty]);
 
   const screenDpr = typeof window !== 'undefined' ? (window.devicePixelRatio || 1) : 1;
-  const dpr = Math.min(
-    Math.max(screenDpr, (currentScale || 1) * screenDpr),
-    8.0
-  );
   const { width: w, height: h } = getCardSize(data);
+  // Deep zoom makes this raster explode: at zoom 5 on a DPR-2 display the old formula
+  // asked for 8x supersampling of the whole card. A generous 16Mpx budget acts as a safety
+  // net for oversized cards without touching the sharpness of normal ones.
+  const dpr = capDprToBudget(
+    Math.min(Math.max(screenDpr, (currentScale || 1) * screenDpr), 8.0),
+    w,
+    h,
+    16_000_000
+  );
 
   const isAssetCard = Boolean(data.fileName || data.isAsset);
   const isScaleMicro = currentScale < 0.4;
@@ -4827,7 +4833,10 @@ export const GenerationCard = React.memo(function GenerationCard({
         <div 
           className="card-selection-scaler w-full flex flex-col gap-3 items-start relative transition-transform duration-200 ease-[cubic-bezier(0.16,1,0.3,1)]"
           style={{
-            transform: isSelected ? 'scale(1.05)' : 'scale(1)',
+            // The 5% selection bump forces the browser to re-raster the whole card at a new
+            // scale. Once the canvas is zoomed past 200% that raster is enormous and the bump
+            // is barely perceptible, so skip it there and keep the click cheap.
+            transform: isSelected && (currentScale || 1) < 2 ? 'scale(1.05)' : 'scale(1)',
             transformOrigin: '50% 120px',
           }}
         >

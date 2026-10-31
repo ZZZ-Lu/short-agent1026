@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react';
 import type { MotionValue } from 'motion/react';
+import { getCappedDpr } from '../utils/devicePixelBudget';
 
 /** A repeating texture keeps the number of draw calls constant at every zoom. */
 export function CanvasGridBackground({ tx, ty, scale }: {
@@ -23,9 +24,11 @@ export function CanvasGridBackground({ tx, ty, scale }: {
 
     const draw = () => {
       raf = null;
-      const dpr = window.devicePixelRatio || 1;
       const width = window.innerWidth;
       const height = window.innerHeight;
+      // Decorative grid: cap the backing store so a large high-DPI window does not pay
+      // for millions of extra pixels on every redraw.
+      const dpr = getCappedDpr(width, height, 1.5);
       const pixelWidth = Math.round(width * dpr);
       const pixelHeight = Math.round(height * dpr);
       if (canvas.width !== pixelWidth || canvas.height !== pixelHeight) {

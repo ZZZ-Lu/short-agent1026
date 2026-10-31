@@ -4,6 +4,7 @@ import {
   calculateObjectCover,
 } from '../utils/imageTextureCache';
 import { getOrLoadThumbImage } from '../utils/thumbnail';
+import { capDprToBudget } from '../utils/devicePixelBudget';
 
 export interface CardImageCanvasProps {
   cardId?: string;
@@ -150,8 +151,9 @@ export const CardImageCanvas: React.FC<CardImageCanvasProps> = React.memo(functi
     // - Full LOD (!effectiveShowOriginal): proxy image is ~1200px max edge. Cap buffer to match proxy's resolution so all 1200px details are preserved.
     // - Original LOD (effectiveShowOriginal): high-res original texture, allow up to 8.0 DPR for deep zoom.
     const maxFullDpr = Math.max(screenDpr, 1200 / Math.max(w, h, 1));
+    // 16Mpx safety net: only oversized cards get clamped, normal ones keep full sharpness.
     const actualDpr = effectiveShowOriginal
-      ? Math.min(baseDpr, 8.0)
+      ? capDprToBudget(Math.min(baseDpr, 8.0), w, h, 16_000_000)
       : Math.min(baseDpr, maxFullDpr);
 
     const targetPxW = Math.round(w * actualDpr);
